@@ -5,6 +5,8 @@ require('dotenv').config();
 
 // Import routes
 const authRoutes = require('./routes/auth');
+// Import models
+const User = require('./models/User');
 
 // Initialize Express app
 const app = express();
@@ -12,18 +14,90 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
+// Seed default admin user from environment variables (if provided)
+async function ensureAdminUser() {
+  try {
+    const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminFullName = process.env.ADMIN_FULLNAME || 'Admin';
+
+    if (!adminEmail || !adminPassword) {
+      // Skip if no credentials provided via env
+      return;
+    }
+
+    let existing = await User.findOne({ email: adminEmail }).select('+password');
+    if (!existing) {
+      const adminUser = new User({
+        fullName: adminFullName,
+        email: adminEmail,
+        password: adminPassword,
+        role: 'admin',
+      });
+      await adminUser.save();
+      console.log(`👑 Admin user created: ${adminEmail}`);
+    } else {
+      // Ensure role is admin (do not overwrite password here unless you explicitly want to)
+      if (existing.role !== 'admin') {
+        existing.role = 'admin';
+        await existing.save({ validateBeforeSave: false });
+        console.log(`👑 Existing user promoted to admin: ${adminEmail}`);
+      }
+    }
+  } catch (e) {
+    console.error('Admin seeding error:', e.message);
+  }
+}
+
+ensureAdminUser();
+
 // Middleware
 
 // CORS configuration
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'https://localhost:5173',
+  'https://localhost:5174',
+  'https://localhost:5175',
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow non-browser or same-origin requests (no origin)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Additionally allow preview URLs from common hosts if configured via env
+    const extra = (process.env.CORS_EXTRA_ORIGINS || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (extra.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Reject others in production, but allow in development to ease local testing
+    if ((process.env.NODE_ENV || 'development') !== 'production') {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS not allowed from origin: ${origin}`));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
 };
 
 app.use(cors(corsOptions));
+// Explicitly handle preflight for all routes
+app.options('*', cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
