@@ -9,6 +9,16 @@ const userSchema = new mongoose.Schema({
     minlength: [2, 'Full name must be at least 2 characters'],
     maxlength: [50, 'Full name cannot exceed 50 characters']
   },
+  // New optional unique username to support username-based login
+  username: {
+    type: String,
+    unique: true,
+    sparse: true, // allow many docs without username
+    trim: true,
+    minlength: [3, 'Username must be at least 3 characters'],
+    maxlength: [30, 'Username cannot exceed 30 characters'],
+    match: [/^[a-zA-Z0-9_\.\-]+$/, 'Username can contain letters, numbers, underscore, dot and hyphen only']
+  },
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -79,11 +89,17 @@ userSchema.methods.updateLastLogin = function() {
 
 // Static method to find user by email
 userSchema.statics.findByEmail = function(email) {
-  return this.findOne({ email: email.toLowerCase() });
+  return this.findOne({ email: (email || '').toLowerCase() });
 };
 
-// Index for better query performance
+// Static method to find user by username
+userSchema.statics.findByUsername = function(username) {
+  return this.findOne({ username });
+};
+
+// Indexes for better query performance
 userSchema.index({ email: 1 });
+userSchema.index({ username: 1 }, { sparse: true });
 userSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);

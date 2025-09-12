@@ -20,6 +20,7 @@ async function ensureAdminUser() {
     const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD;
     const adminFullName = process.env.ADMIN_FULLNAME || 'Admin';
+    const adminUsername = (process.env.ADMIN_USERNAME || '').trim();
 
     if (!adminEmail || !adminPassword) {
       // Skip if no credentials provided via env
@@ -33,15 +34,32 @@ async function ensureAdminUser() {
         email: adminEmail,
         password: adminPassword,
         role: 'admin',
+        ...(adminUsername && { username: adminUsername })
       });
       await adminUser.save();
-      console.log(`👑 Admin user created: ${adminEmail}`);
+      console.log(`👑 Admin user created: ${adminEmail}${adminUsername ? ` (username: ${adminUsername})` : ''}`);
     } else {
       // Ensure role is admin (do not overwrite password here unless you explicitly want to)
+      let changed = false;
       if (existing.role !== 'admin') {
         existing.role = 'admin';
-        await existing.save({ validateBeforeSave: false });
-        console.log(`👑 Existing user promoted to admin: ${adminEmail}`);
+        changed = true;
+      }
+      if (adminUsername && existing.username !== adminUsername) {
+        existing.username = adminUsername;
+        changed = true;
+      }
+      if (changed) {
+        try {
+          await existing.save({ validateBeforeSave: false });
+          console.log(`👑 Existing user updated/promoted to admin: ${adminEmail}${adminUsername ? ` (username: ${adminUsername})` : ''}`);
+        } catch (e) {
+          if (e.code === 11000) {
+            console.warn('⚠️  Could not set admin username due to duplicate username.');
+          } else {
+            throw e;
+          }
+        }
       }
     }
   } catch (e) {
