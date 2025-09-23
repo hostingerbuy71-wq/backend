@@ -5,6 +5,9 @@ require('dotenv').config();
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const usersRoutes = require('./routes/users');
+const sportsRoutes = require('./routes/sports');
+const gamesRoutes = require('./routes/games');
 // Import models
 const User = require('./models/User');
 
@@ -147,10 +150,16 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
+// Routes
+console.log('Loading routes...');
 app.use('/api/auth', authRoutes);
-app.use('/api/sports', require('./routes/sports'));
-app.use('/api/games', require('./routes/games'));
+console.log('Auth routes loaded');
+app.use('/api/users', usersRoutes);
+console.log('Users routes loaded');
+app.use('/api/sports', sportsRoutes);
+console.log('Sports routes loaded');
+app.use('/api/games', gamesRoutes);
+console.log('Games routes loaded');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -169,6 +178,9 @@ app.use('*', (req, res) => {
     message: `Route ${req.originalUrl} not found`,
     availableRoutes: {
       auth: '/api/auth',
+      users: '/api/users',
+      sports: '/api/sports',
+      games: '/api/games',
       health: '/health'
     }
   });
