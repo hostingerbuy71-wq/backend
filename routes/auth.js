@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, oneOf } = require('express-validator');
-const { register, login, getProfile, logout } = require('../controllers/authController');
+const { register, login, getProfile, logout, adminCreateUser } = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,6 +11,14 @@ const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email address'),
   body('password').isLength({ min: 3 }).withMessage('Password must be at least 3 characters long'),
   body('username').optional().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters')
+];
+
+const adminCreateUserValidation = [
+  body('fullName').trim().isLength({ min: 2, max: 50 }).withMessage('Full name must be between 2 and 50 characters').matches(/^[a-zA-Z\s]+$/).withMessage('Full name can only contain letters and spaces'),
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email address'),
+  body('password').isLength({ min: 3 }).withMessage('Password must be at least 3 characters long'),
+  body('username').optional().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
+  body('role').optional().isIn(['user', 'admin']).withMessage('Role must be either user or admin')
 ];
 
 const loginValidation = [
@@ -26,6 +34,9 @@ router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.get('/profile', authenticateToken, getProfile);
 router.post('/logout', authenticateToken, logout);
+
+// Admin route to create users
+router.post('/admin/create-user', authenticateToken, adminCreateUserValidation, adminCreateUser);
 
 // @route   GET /api/auth/verify
 router.get('/verify', authenticateToken, (req, res) => {

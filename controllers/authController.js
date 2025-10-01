@@ -49,6 +49,63 @@ const register = async (req, res) => {
   }
 };
 
+// Admin create user (only admin can create users)
+const adminCreateUser = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+    }
+
+    // Check if the requesting user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
+    }
+
+    const { fullName, email, password, username, role = 'user' } = req.body;
+
+    // Check if user already exists (email)
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'User with this email already exists' });
+    }
+
+    // Optional: ensure username unique if provided
+    if (username) {
+      const existingUsername = await User.findByUsername(username);
+      if (existingUsername) {
+        return res.status(409).json({ success: false, message: 'Username is already taken' });
+      }
+    }
+
+    const user = new User({ fullName, email, password, username, role });
+    await user.save();
+
+    const userData = {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt
+    };
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'User created successfully by admin', 
+      data: { user: userData } 
+    });
+  } catch (error) {
+    console.error('Admin user creation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'User creation failed', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' 
+    });
+  }
+};
+
 // Login user (email or username)
 const login = async (req, res) => {
   try {
@@ -134,4 +191,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getProfile, logout };
+module.exports = { register, login, getProfile, logout, adminCreateUser };

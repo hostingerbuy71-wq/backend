@@ -85,40 +85,41 @@ const allowedOrigins = [
   'https://localhost:5175',
 ].filter(Boolean);
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow non-browser or same-origin requests (no origin)
-    if (!origin) return callback(null, true);
+// const corsOptions = {
+//   origin: (origin, callback) => {
+//     // Allow non-browser or same-origin requests (no origin)
+//     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+//     if (allowedOrigins.includes(origin)) {
+//       return callback(null, true);
+//     }
 
-    // Additionally allow preview URLs from common hosts if configured via env
-    const extra = (process.env.CORS_EXTRA_ORIGINS || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-    if (extra.includes(origin)) {
-      return callback(null, true);
-    }
+//     // Additionally allow preview URLs from common hosts if configured via env
+//     const extra = (process.env.CORS_EXTRA_ORIGINS || '')
+//       .split(',')
+//       .map(s => s.trim())
+//       .filter(Boolean);
+//     if (extra.includes(origin)) {
+//       return callback(null, true);
+//     }
 
-    // Reject others in production, but allow in development to ease local testing
-    if ((process.env.NODE_ENV || 'development') !== 'production') {
-      return callback(null, true);
-    }
+//     // Reject others in production, but allow in development to ease local testing
+//     if ((process.env.NODE_ENV || 'development') !== 'production') {
+//       return callback(null, true);
+//     }
 
-    return callback(new Error(`CORS not allowed from origin: ${origin}`));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-};
+//     return callback(new Error(`CORS not allowed from origin: ${origin}`));
+//   },
+//   credentials: true,
+//   optionsSuccessStatus: 200,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+// };
+// app.use(cors(corsOptions));
 
-app.use(cors(corsOptions));
+app.use(cors());
 // Explicitly handle preflight for all routes
-app.options('*', cors(corsOptions));
+app.options('*', cors());
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

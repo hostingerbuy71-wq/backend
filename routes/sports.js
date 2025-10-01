@@ -1,6 +1,9 @@
+const { default: axios } = require('axios');
 const express = require('express');
 const router = express.Router();
-
+const zlib = require("zlib");
+const xml2js = require("xml2js");
+const { parseStringPromise } = xml2js; 
 // Helper: safe fetch with timeout
 async function safeFetch(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -11,6 +14,29 @@ async function safeFetch(url, options = {}, timeoutMs = 8000) {
   } finally {
     clearTimeout(id);
   }
+}
+
+// Helper: Goalserve API request using request library
+function goalserveRequest(url) {
+  return new Promise((resolve, reject) => {
+    const request = require('request');
+    const options = {
+      method: 'GET',
+      url: url,
+      timeout: 10000,
+     
+    };
+    
+    request(options, function (error, response, body) {
+      if (error) {
+        reject(new Error(error));
+      } else if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+      } else {
+        resolve({ body, response });
+      }
+    });
+  });
 }
 
 // Normalize to a common shape for the frontend
@@ -36,9 +62,42 @@ const demo = {
     { id: 'demo_t_3', display: '🔴 DEMO: Carlos Alcaraz vs Daniil Medvedev', status: 'Live', tournament: 'Wimbledon' }
   ],
   soccer: [
-    { id: 'demo_s_1', display: '🔴 DEMO: Manchester United vs Liverpool', status: 'Live', tournament: 'Premier League' },
-    { id: 'demo_s_2', display: '🔴 DEMO: Barcelona vs Real Madrid', status: 'Upcoming', tournament: 'La Liga' },
-    { id: 'demo_s_3', display: '🔴 DEMO: Bayern Munich vs Dortmund', status: 'Live', tournament: 'Bundesliga' }
+    { 
+      id: 'demo_s_1', 
+      name: 'Manchester United vs Liverpool',
+      display: '🔴 DEMO: Manchester United vs Liverpool', 
+      status: 'Live', 
+      tournament: 'Premier League',
+      info: { league: 'Premier League', period: '2nd Half' },
+      team_info: { 
+        home: { name: 'Manchester United' }, 
+        away: { name: 'Liverpool' } 
+      }
+    },
+    { 
+      id: 'demo_s_2', 
+      name: 'Barcelona vs Real Madrid',
+      display: '🔴 DEMO: Barcelona vs Real Madrid', 
+      status: 'Upcoming', 
+      tournament: 'La Liga',
+      info: { league: 'La Liga', status: 'Upcoming' },
+      team_info: { 
+        home: { name: 'Barcelona' }, 
+        away: { name: 'Real Madrid' } 
+      }
+    },
+    { 
+      id: 'demo_s_3', 
+      name: 'Bayern Munich vs Dortmund',
+      display: '🔴 DEMO: Bayern Munich vs Dortmund', 
+      status: 'Live', 
+      tournament: 'Bundesliga',
+      info: { league: 'Bundesliga', period: '1st Half' },
+      team_info: { 
+        home: { name: 'Bayern Munich' }, 
+        away: { name: 'Dortmund' } 
+      }
+    }
   ]
 };
 
@@ -154,58 +213,189 @@ router.get('/tennis', async (req, res) => {
 });
 
 // GET /api/sports/soccer
-router.get('/soccer', async (req, res) => {
-  const results = { source: null, fallbackUsed: false, data: [] };
+// router.get('/soccer', async (req, res) => {
+//   const results = { source: null, fallbackUsed: false, data: [] };
+//   try {
+//     // Try Goalserve Soccer API first
+//     try {
+//       console.log('🏈 Attempting Goalserve Soccer API...');
+//       const goalserveResult = await goalserveRequest('http://inplay.goalserve.com/inplay-soccer.gz');
+      
+//       if (goalserveResult && goalserveResult.body) {
+//         console.log('🏈 Goalserve Soccer API Response received',goalserveResult);
+        
+//         // Parse the response (assuming it's JSON or XML)
+//         let soccerData;
+//         try {
+//           // Try parsing as JSON first
+//           soccerData = JSON.parse(goalserveResult.body);
+//         } catch (jsonError) {
+//           // If JSON parsing fails, it might be XML or compressed data
+//           console.log('🏈 Response is not JSON, might be XML or compressed data');
+//           soccerData = goalserveResult.body;
+//         }
+        
+//         console.log('🏈 Goalserve Soccer Data:', JSON.stringify(soccerData, null, 2));
+        
+//         // Extract matches from the data structure
+//         let matches = [];
+//         if (typeof soccerData === 'object' && soccerData !== null) {
+//           // Handle different possible data structures
+//           matches = soccerData.matches || soccerData.games || soccerData.fixtures || [];
+//           if (!Array.isArray(matches) && soccerData.data) {
+//             matches = soccerData.data.matches || soccerData.data.games || [];
+//           }
+//         }
+        
+//         if (Array.isArray(matches) && matches.length > 0) {
+//           results.source = 'goalserve-soccer';
+//           results.data = matches.slice(0, 12).map((m, i) => ({
+//             id: m.id || m.match_id || `goalserve_soccer_${i}`,
+//             display: `${m.home_team || m.localteam || m.team1 || 'Team 1'} vs ${m.away_team || m.visitorteam || m.team2 || 'Team 2'}`,
+//             status: m.status || m.match_status || 'Live',
+//             tournament: m.league || m.competition || m.tournament || 'Soccer League',
+//             score: m.score || `${m.home_score || 0} - ${m.away_score || 0}`,
+//             time: m.time || m.minute || m.elapsed || '0\''
+//           }));
+          
+//           console.log(`🏈 Successfully loaded ${results.data.length} soccer matches from Goalserve`);
+//           return res.json({ success: true, ...results });
+//         } else {
+//           console.log('🏈 No matches found in Goalserve response, trying other APIs...');
+//         }
+//       }
+//     } catch (goalserveError) {
+//       console.error('🏈 Goalserve Soccer API Error:', goalserveError.message);
+//     }
+
+//     // Football-data.org
+//     if (process.env.FOOTBALL_DATA_API_KEY) {
+//       const r = await safeFetch('https://api.football-data.org/v4/matches?status=LIVE', {
+//         headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_API_KEY }
+//       });
+//       if (r.ok) {
+//         const json = await r.json();
+//         if (Array.isArray(json.matches) && json.matches.length) {
+//           results.source = 'football-data';
+//           results.data = json.matches.slice(0, 12).map((m, i) => ({
+//             id: m.id || `football_${i}`,
+//             display: `${m.homeTeam?.name || 'Team 1'} vs ${m.awayTeam?.name || 'Team 2'}`,
+//             status: m.status || (m.score?.winner ? 'Finished' : 'Live'),
+//             tournament: m.competition?.name || 'Football League'
+//           }));
+//           return res.json({ success: true, ...results });
+//         }
+//       }
+//     }
+
+//     // API-Football via RapidAPI
+//     if (process.env.RAPIDAPI_KEY) {
+//       const r = await safeFetch('https://api-football-v1.p.rapidapi.com/v3/fixtures?live=all', {
+//         headers: {
+//           'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+//           'X-RapidAPI-Host': 'api-football-v1.p.rapidapi.com'
+//         }
+//       });
+//       if (r.ok) {
+//         const json = await r.json();
+//         if (Array.isArray(json.response) && json.response.length) {
+//           results.source = 'api-football';
+//           results.data = json.response.slice(0, 12).map((m, i) => ({
+//             id: m.fixture?.id || `apisports_${i}`,
+//             display: `${m.teams?.home?.name || 'Team 1'} vs ${m.teams?.away?.name || 'Team 2'}`,
+//             status: m.fixture?.status?.long || 'Live',
+//             tournament: m.league?.name || 'Football League'
+//           }));
+//           return res.json({ success: true, ...results });
+//         }
+//       }
+//     }
+
+//     results.fallbackUsed = true;
+//     results.source = 'demo';
+//     results.data = demo.soccer;
+//     return res.json({ success: true, ...results });
+//   } catch (e) {
+//     return res.status(200).json({ success: true, source: 'demo', fallbackUsed: true, data: demo.soccer });
+//   }
+// });
+router.get("/soccer", async (req, res) => {
   try {
-    // Football-data.org
-    if (process.env.FOOTBALL_DATA_API_KEY) {
-      const r = await safeFetch('https://api.football-data.org/v4/matches?status=LIVE', {
-        headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_API_KEY }
-      });
-      if (r.ok) {
-        const json = await r.json();
-        if (Array.isArray(json.matches) && json.matches.length) {
-          results.source = 'football-data';
-          results.data = json.matches.slice(0, 12).map((m, i) => ({
-            id: m.id || `football_${i}`,
-            display: `${m.homeTeam?.name || 'Team 1'} vs ${m.awayTeam?.name || 'Team 2'}`,
-            status: m.status || (m.score?.winner ? 'Finished' : 'Live'),
-            tournament: m.competition?.name || 'Football League'
-          }));
-          return res.json({ success: true, ...results });
-        }
-      }
+    const response = await axios.get(
+      "http://inplay.goalserve.com/inplay-soccer.gz",
+      { responseType: "arraybuffer" }
+    );
+
+    let data;
+    try {
+      // Try to decompress as GZIP
+      const decompressed = zlib.gunzipSync(response.data);
+      data = decompressed.toString("utf-8");
+    } catch (e) {
+      console.log(" Data is not gzip, treating as plain text");
+      data = response.data.toString("utf-8"); // plain text
     }
 
-    // API-Football via RapidAPI
-    if (process.env.RAPIDAPI_KEY) {
-      const r = await safeFetch('https://api-football-v1.p.rapidapi.com/v3/fixtures?live=all', {
-        headers: {
-          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'api-football-v1.p.rapidapi.com'
-        }
-      });
-      if (r.ok) {
-        const json = await r.json();
-        if (Array.isArray(json.response) && json.response.length) {
-          results.source = 'api-football';
-          results.data = json.response.slice(0, 12).map((m, i) => ({
-            id: m.fixture?.id || `apisports_${i}`,
-            display: `${m.teams?.home?.name || 'Team 1'} vs ${m.teams?.away?.name || 'Team 2'}`,
-            status: m.fixture?.status?.long || 'Live',
-            tournament: m.league?.name || 'Football League'
-          }));
-          return res.json({ success: true, ...results });
-        }
+    // Decide whether it's JSON or XML
+    if (data.trim().startsWith("{")) {
+      // It's JSON
+      const jsonData = JSON.parse(data);
+      
+      // Process the data to extract team names and format for frontend
+      let processedMatches = [];
+      
+      if (jsonData && jsonData.data && jsonData.data.events) {
+        const events = jsonData.data.events;
+        
+        // Convert events object to array if it's an object
+        const eventsArray = Array.isArray(events) ? events : Object.values(events);
+        
+        processedMatches = eventsArray.slice(0, 10).map((match, index) => {
+          // Extract team names from team_info
+          const homeTeam = match.team_info?.home?.name || 'Team A';
+          const awayTeam = match.team_info?.away?.name || 'Team B';
+          const matchName = `${homeTeam} vs ${awayTeam}`;
+          
+          // Extract other match information
+          const league = match.info?.league || 'Soccer League';
+          const status = match.info?.period ? 'Live' : (match.info?.status || 'Upcoming');
+          const period = match.info?.period || '';
+          
+          return {
+            id: match.id || `match_${index}`,
+            name: matchName,
+            display: matchName, // Keep for backward compatibility
+            status: status,
+            tournament: league,
+            info: match.info,
+            team_info: match.team_info,
+            // Include original match data for MatchDetails component
+            originalData: match
+          };
+        });
       }
+      
+      return res.json({ 
+        success: true, 
+        data: processedMatches,
+        originalData: jsonData // Keep original data for debugging
+      });
+    } else {
+      // It's XML
+      const jsonData = await parseStringPromise(data);
+      return res.json({ success: true, data: jsonData });
     }
-
-    results.fallbackUsed = true;
-    results.source = 'demo';
-    results.data = demo.soccer;
-    return res.json({ success: true, ...results });
-  } catch (e) {
-    return res.status(200).json({ success: true, source: 'demo', fallbackUsed: true, data: demo.soccer });
+  } catch (error) {
+    console.error(" Error fetching Goalserve:", error.message);
+    
+    // Return demo data as fallback when Goalserve API fails (including 403 errors)
+    console.log(" Falling back to demo soccer data");
+    return res.json({ 
+      success: true, 
+      source: 'demo', 
+      fallbackUsed: true, 
+      data: demo.soccer 
+    });
   }
 });
 
