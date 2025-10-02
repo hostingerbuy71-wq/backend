@@ -395,26 +395,30 @@ router.get("/soccer", async (req, res) => {
 
     let data;
     try {
-      // decompress gzip
       const decompressed = zlib.gunzipSync(response.data);
       data = decompressed.toString("utf-8");
     } catch {
-      // not gzip
       data = response.data.toString("utf-8");
     }
 
-    // agar JSON hai
     if (data.trim().startsWith("{")) {
       return res.json(JSON.parse(data));
-    } 
-    // agar XML hai
-    else {
+    } else {
       const jsonData = await parseStringPromise(data);
       return res.json(jsonData);
     }
   } catch (error) {
     console.error("❌ Error fetching Goalserve:", error.message);
-    res.status(500).json({ success: false, message: "Failed to fetch soccer data" });
+    
+    // 👉 Fallback demo response
+    res.json({
+      success: true,
+      source: "demo",
+      data: [
+        { id: 1, home: "Team A", away: "Team B", status: "Live" },
+        { id: 2, home: "Team C", away: "Team D", status: "Upcoming" },
+      ],
+    });
   }
 });
 
