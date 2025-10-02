@@ -7,10 +7,10 @@ const {
   cancelBet, 
   getBettingSummary 
 } = require('../controllers/bettingController');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // All betting routes require authentication
-router.use(auth);
+router.use(authenticateToken);
 
 // Place a new bet
 router.post('/place', placeBet);
