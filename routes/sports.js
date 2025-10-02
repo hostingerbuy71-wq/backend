@@ -386,40 +386,23 @@ router.get('/tennis', async (req, res) => {
 //     });
 //   }
 // });
+
+
 router.get("/soccer", async (req, res) => {
   try {
     const response = await axios.get(
-      "http://inplay.goalserve.com/inplay-soccer.gz",
-      { responseType: "arraybuffer" }
+      "http://inplay.goalserve.com/inplay-soccer.gz"
     );
 
-    let data;
-    try {
-      const decompressed = zlib.gunzipSync(response.data);
-      data = decompressed.toString("utf-8");
-    } catch {
-      data = response.data.toString("utf-8");
-    }
-
-    if (data.trim().startsWith("{")) {
-      return res.json(JSON.parse(data));
-    } else {
-      const jsonData = await parseStringPromise(data);
-      return res.json(jsonData);
-    }
+    // jo bhi response aaya, usko as it is frontend pe bhej do
+    res.send(response.data);
   } catch (error) {
     console.error("❌ Error fetching Goalserve:", error.message);
-    
-    // 👉 Fallback demo response
-    res.json({
-      success: true,
-      source: "demo",
-      data: [
-        { id: 1, home: "Team A", away: "Team B", status: "Live" },
-        { id: 2, home: "Team C", away: "Team D", status: "Upcoming" },
-      ],
-    });
+    res.status(500).send("Failed to fetch soccer data");
   }
 });
+
+export default router;
+
 
 module.exports = router;
