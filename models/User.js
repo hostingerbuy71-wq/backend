@@ -104,7 +104,6 @@ userSchema.statics.findByUsername = function(username) {
 
 // Indexes for better query performance
 // Create indexes
-userSchema.index({ email: 1 });
 userSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);
