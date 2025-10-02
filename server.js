@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const sportsRoutes = require('./routes/sports');
 const gamesRoutes = require('./routes/games');
+const bettingRoutes = require('./routes/betting');
 // Import models
 const User = require('./models/User');
 
@@ -161,6 +162,8 @@ app.use('/api/sports', sportsRoutes);
 console.log('Sports routes loaded');
 app.use('/api/games', gamesRoutes);
 console.log('Games routes loaded');
+app.use('/api/betting', bettingRoutes);
+console.log('Betting routes loaded');
 
 // Root endpoint
 app.get('/', (req, res) => {

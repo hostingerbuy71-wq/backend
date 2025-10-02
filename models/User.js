@@ -38,6 +38,11 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  balance: {
+    type: Number,
+    default: 10000, // Default balance for new users
+    min: [0, 'Balance cannot be negative']
+  },
   isActive: {
     type: Boolean,
     default: true

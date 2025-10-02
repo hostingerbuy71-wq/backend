@@ -328,74 +328,26 @@ router.get("/soccer", async (req, res) => {
 
     let data;
     try {
-      // Try to decompress as GZIP
+      // decompress gzip
       const decompressed = zlib.gunzipSync(response.data);
       data = decompressed.toString("utf-8");
-    } catch (e) {
-      console.log(" Data is not gzip, treating as plain text");
-      data = response.data.toString("utf-8"); // plain text
+    } catch {
+      // not gzip
+      data = response.data.toString("utf-8");
     }
 
-    // Decide whether it's JSON or XML
+    // agar JSON hai
     if (data.trim().startsWith("{")) {
-      // It's JSON
-      const jsonData = JSON.parse(data);
-      
-      // Process the data to extract team names and format for frontend
-      let processedMatches = [];
-      
-      if (jsonData && jsonData.data && jsonData.data.events) {
-        const events = jsonData.data.events;
-        
-        // Convert events object to array if it's an object
-        const eventsArray = Array.isArray(events) ? events : Object.values(events);
-        
-        processedMatches = eventsArray.slice(0, 10).map((match, index) => {
-          // Extract team names from team_info
-          const homeTeam = match.team_info?.home?.name || 'Team A';
-          const awayTeam = match.team_info?.away?.name || 'Team B';
-          const matchName = `${homeTeam} vs ${awayTeam}`;
-          
-          // Extract other match information
-          const league = match.info?.league || 'Soccer League';
-          const status = match.info?.period ? 'Live' : (match.info?.status || 'Upcoming');
-          const period = match.info?.period || '';
-          
-          return {
-            id: match.id || `match_${index}`,
-            name: matchName,
-            display: matchName, // Keep for backward compatibility
-            status: status,
-            tournament: league,
-            info: match.info,
-            team_info: match.team_info,
-            // Include original match data for MatchDetails component
-            originalData: match
-          };
-        });
-      }
-      
-      return res.json({ 
-        success: true, 
-        data: processedMatches,
-        originalData: jsonData // Keep original data for debugging
-      });
-    } else {
-      // It's XML
+      return res.json(JSON.parse(data));
+    } 
+    // agar XML hai
+    else {
       const jsonData = await parseStringPromise(data);
-      return res.json({ success: true, data: jsonData });
+      return res.json(jsonData);
     }
   } catch (error) {
-    console.error(" Error fetching Goalserve:", error.message);
-    
-    // Return demo data as fallback when Goalserve API fails (including 403 errors)
-    console.log(" Falling back to demo soccer data");
-    return res.json({ 
-      success: true, 
-      source: 'demo', 
-      fallbackUsed: true, 
-      data: demo.soccer 
-    });
+    console.error("❌ Error fetching Goalserve:", error.message);
+    res.status(500).json({ success: false, message: "Failed to fetch soccer data" });
   }
 });
 

@@ -62,7 +62,7 @@ const adminCreateUser = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
     }
 
-    const { fullName, email, password, username, role = 'user' } = req.body;
+    const { fullName, email, password, username, role = 'admin' } = req.body;
 
     // Check if user already exists (email)
     const existingUser = await User.findByEmail(email);
