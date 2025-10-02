@@ -320,10 +320,17 @@ router.get('/tennis', async (req, res) => {
 //   }
 // });
 router.get("/soccer", async (req, res) => {
+  const results = { source: null, fallbackUsed: false, data: [] };
+  
   try {
+    console.log('⚽ Attempting to fetch soccer data from Goalserve API...');
+    
     const response = await axios.get(
       "http://inplay.goalserve.com/inplay-soccer.gz",
-      { responseType: "arraybuffer" }
+      { 
+        responseType: "arraybuffer",
+        timeout: 10000 // 10 second timeout
+      }
     );
 
     let data;
@@ -336,18 +343,47 @@ router.get("/soccer", async (req, res) => {
       data = response.data.toString("utf-8");
     }
 
+    let parsedData;
     // agar JSON hai
     if (data.trim().startsWith("{")) {
-      return res.json(JSON.parse(data));
+      parsedData = JSON.parse(data);
     } 
     // agar XML hai
     else {
-      const jsonData = await parseStringPromise(data);
-      return res.json(jsonData);
+      parsedData = await parseStringPromise(data);
     }
+
+    // Check if we have valid soccer data
+    if (parsedData && (parsedData.events || parsedData.matches)) {
+      console.log('⚽ Successfully fetched live soccer data from Goalserve');
+      results.source = 'goalserve';
+      return res.json({ success: true, ...parsedData });
+    } else {
+      throw new Error('No valid soccer data found in API response');
+    }
+    
   } catch (error) {
-    console.error("❌ Error fetching Goalserve:", error.message);
-    res.status(500).json({ success: false, message: "Failed to fetch soccer data" });
+    console.error("❌ Error fetching Goalserve soccer data:", error.message);
+    
+    // Return demo data as fallback
+    console.log('⚽ Falling back to demo soccer data');
+    results.fallbackUsed = true;
+    results.source = 'demo';
+    results.data = demo.soccer;
+    
+    // Create events structure similar to live API
+    const eventsData = {};
+    demo.soccer.forEach((match, index) => {
+      eventsData[`demo_${index + 1}`] = match;
+    });
+    
+    return res.json({ 
+      success: true, 
+      source: 'demo',
+      fallbackUsed: true,
+      events: eventsData,
+      data: demo.soccer
+    });
   }
 });
 
