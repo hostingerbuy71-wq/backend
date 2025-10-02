@@ -402,7 +402,4 @@ router.get("/soccer", async (req, res) => {
   }
 });
 
-export default router;
-
-
 module.exports = router;
