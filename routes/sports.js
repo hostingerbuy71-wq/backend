@@ -398,7 +398,12 @@ router.get("/soccer", async (req, res) => {
       "http://inplay.goalserve.com/inplay-soccer.gz",
       { 
         responseType: "arraybuffer",
-        timeout: 10000 // 10 second timeout
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': '*/*',
+          'Accept-Encoding': 'gzip, deflate'
+        }
       }
     );
 
@@ -412,24 +417,36 @@ router.get("/soccer", async (req, res) => {
       data = response.data.toString("utf-8");
     }
 
+    console.log('📊 Raw API Response (first 500 chars):', data.substring(0, 500));
+
     let parsedData;
     // Check if JSON
     if (data.trim().startsWith("{")) {
       parsedData = JSON.parse(data);
+      console.log('📊 Parsed JSON data structure:', Object.keys(parsedData));
     } 
     // Check if XML
     else if (data.trim().startsWith("<")) {
       parsedData = await parseStringPromise(data);
+      console.log('📊 Parsed XML data structure:', Object.keys(parsedData));
     }
     else {
+      console.log('📊 Unknown data format, raw data:', data.substring(0, 200));
       throw new Error('Unknown data format received from API');
     }
 
     // Check if we have valid soccer data
-    if (parsedData && (parsedData.events || parsedData.matches || parsedData.scores)) {
+    if (parsedData) {
       console.log('⚽ Successfully fetched live soccer data from Goalserve');
-      results.source = 'goalserve';
-      return res.json({ success: true, source: 'goalserve', data: parsedData });
+      console.log('📊 Available data keys:', Object.keys(parsedData));
+      
+      return res.json({ 
+        success: true, 
+        source: 'goalserve', 
+        dataStructure: Object.keys(parsedData),
+        sampleData: parsedData,
+        rawDataPreview: data.substring(0, 1000)
+      });
     } else {
       throw new Error('No valid soccer data found in API response');
     }
@@ -437,7 +454,14 @@ router.get("/soccer", async (req, res) => {
   } catch (error) {
     console.error("❌ Error fetching Goalserve soccer data:", error.message);
     
-    // Return demo data as fallback
+    // Handle specific error cases
+    if (error.response && error.response.status === 429) {
+      console.log('⚠️ Rate limited by Goalserve API, falling back to demo data');
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      console.log('⚠️ Cannot connect to Goalserve API, falling back to demo data');
+    }
+    
+    // Return demo data as fallback with detailed structure
     console.log('⚽ Falling back to demo soccer data');
     results.fallbackUsed = true;
     results.source = 'demo';
@@ -453,8 +477,11 @@ router.get("/soccer", async (req, res) => {
       success: true, 
       source: 'demo',
       fallbackUsed: true,
+      error: error.message,
       events: eventsData,
-      data: demo.soccer
+      data: demo.soccer,
+      dataStructure: ['events', 'data'],
+      message: 'Using demo data due to API unavailability or rate limiting'
     });
   }
 });
